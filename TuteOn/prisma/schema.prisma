@@ -1,0 +1,99 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // Hashed password for email/pass auth
+  role          String    @default("STUDENT") // "TEACHER" or "STUDENT"
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  teacherProfile TeacherProfile?
+  studentRequests StudentRequest[] // Requests made by this student
+  
+  transactions   Transaction[]
+  contacts       ContactAccess[]
+}
+
+model TeacherProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  bio         String?
+  experience  String?
+  subjects    String?  // Comma separated for MVP
+  education   String?
+  
+  coins       Int      @default(0)
+  pricePerHour Int?
+  
+  unlockedContacts ContactAccess[] // Teachers unlock students
+}
+
+model StudentRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  subject     String
+  grade       String?
+  description String?
+  status      String   @default("OPEN") // OPEN, CLOSED, RESOLVED
+  
+  type        String   @default("ONE_ON_ONE") // ONE_ON_ONE, GROUP
+  groupSize   Int      @default(1) // Target size for group classes
+
+  unlockCount Int      @default(0)
+  maxUnlocks  Int      @default(5)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // If a specific teacher is selected/finalized
+  finalizedTeacherId String?
+  
+  accesses    ContactAccess[]
+}
+
+model ContactAccess {
+  id              String         @id @default(cuid())
+  teacherId       String
+  teacher         TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  
+  studentRequestId String?       // Optional: access via request
+  studentRequest   StudentRequest? @relation(fields: [studentRequestId], references: [id])
+  
+  studentId       String         // The student whose contact is revealed
+  user            User           @relation(fields: [studentId], references: [id])  
+
+  createdAt       DateTime       @default(now())
+
+  @@unique([teacherId, studentRequestId]) // One unlock per request per teacher
+}
+
+model Transaction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  amount    Int      
+  type      String   // DEPOSIT, SPEND
+  description String?
+  
+  createdAt DateTime @default(now())
+}
